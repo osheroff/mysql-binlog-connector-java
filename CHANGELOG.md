@@ -24,6 +24,17 @@
 - Fixes for JSON data in mysql 8.0.16+ https://github.com/shyiko/mysql-binlog-connector-java/pull/288
 - more fixes for the bizarre azure platform https://github.com/shyiko/mysql-binlog-connector-java/pull/275
 
+## [0.21.0](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.20.1...0.21.0) - 2020-06-08
+
+### Fixed
+- Potential deadlock when keepAlive is on ([#321](https://github.com/shyiko/mysql-binlog-connector-java/issues/321)).
+
+### Changed
+- `BinaryLogClient.LifecycleListener::onConnect()` order relative to keepAlive thread `start()`. 
+Calling `disconnect()` inside `onConnect()` is now guaranteed to terminate keepAlive thread ([#213](https://github.com/shyiko/mysql-binlog-connector-java/pull/213), 
+[260](https://github.com/shyiko/mysql-binlog-connector-java/pull/260)).     
+A side effect of this change is that throwing RuntimeException inside `onConnect()` will no longer prevent keepAlive thread from starting.
+
 ## [0.20.1](https://github.com/shyiko/mysql-binlog-connector-java/compare/0.20.0...0.20.1) - 2019-05-12
 
 ### Added
