@@ -40,11 +40,14 @@ public class EventHeaderV4Deserializer implements EventHeaderDeserializer<EventH
         return header;
     }
 
-    private static EventType getEventType(int ordinal) {
-        if (ordinal >= EVENT_TYPES.length) {
+    private static EventType getEventType(int eventNumber) {
+
+        EventType t = EventType.byEventNumber(eventNumber);
+        if(t == null) {
             return EventType.UNKNOWN;
+        } else {
+            return t;
         }
-        return EVENT_TYPES[ordinal];
     }
 
 }
