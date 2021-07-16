@@ -15,11 +15,14 @@
  */
 package com.github.shyiko.mysql.binlog;
 
+import com.github.shyiko.mysql.binlog.event.AnnotateRowsEventData;
 import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventHeader;
 import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.EventType;
 import com.github.shyiko.mysql.binlog.event.GtidEventData;
+import com.github.shyiko.mysql.binlog.event.MariadbGtidEventData;
+import com.github.shyiko.mysql.binlog.event.MariadbGtidListEventData;
 import com.github.shyiko.mysql.binlog.event.QueryEventData;
 import com.github.shyiko.mysql.binlog.event.RotateEventData;
 import com.github.shyiko.mysql.binlog.event.deserialization.ChecksumType;
@@ -46,9 +49,6 @@ import com.github.shyiko.mysql.binlog.network.protocol.GreetingPacket;
 import com.github.shyiko.mysql.binlog.network.protocol.Packet;
 import com.github.shyiko.mysql.binlog.network.protocol.PacketChannel;
 import com.github.shyiko.mysql.binlog.network.protocol.ResultSetRowPacket;
-import com.github.shyiko.mysql.binlog.network.protocol.command.AuthenticateNativePasswordCommand;
-import com.github.shyiko.mysql.binlog.network.protocol.command.AuthenticateSHA2Command;
-import com.github.shyiko.mysql.binlog.network.protocol.command.AuthenticateSecurityPasswordCommand;
 import com.github.shyiko.mysql.binlog.network.protocol.command.Command;
 import com.github.shyiko.mysql.binlog.network.protocol.command.DumpBinaryLogCommand;
 import com.github.shyiko.mysql.binlog.network.protocol.command.DumpBinaryLogGtidCommand;
@@ -135,8 +135,8 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private volatile long connectionId;
     private SSLMode sslMode = SSLMode.DISABLED;
 
-    private GtidSet gtidSet;
-    private final Object gtidSetAccessLock = new Object();
+    protected GtidSet gtidSet;
+    protected final Object gtidSetAccessLock = new Object();
     private boolean gtidSetFallbackToPurged;
     private boolean useBinlogFilenamePositionInGtidMode;
     private String gtid;
@@ -150,7 +150,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private SocketFactory socketFactory;
     private SSLSocketFactory sslSocketFactory;
 
-    private volatile PacketChannel channel;
+    protected volatile PacketChannel channel;
     private volatile boolean connected;
     private volatile long masterServerId = -1;
 
@@ -335,8 +335,12 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             this.binlogFilename = "";
         }
         synchronized (gtidSetAccessLock) {
-            this.gtidSet = gtidSet != null ? new GtidSet(gtidSet) : null;
+            this.gtidSet = gtidSet != null ? buildGtidSet(gtidSet) : null;
         }
+    }
+
+    protected GtidSet buildGtidSet(String gtidSet) {
+        return new GtidSet(gtidSet);
     }
 
     /**
@@ -539,11 +543,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
                 connectionId = greetingPacket.getThreadId();
                 if ("".equals(binlogFilename)) {
-                    synchronized (gtidSetAccessLock) {
-                        if (gtidSet != null && "".equals(gtidSet.toString()) && gtidSetFallbackToPurged) {
-                            gtidSet = new GtidSet(fetchGtidPurged());
-                        }
-                    }
+                    setupGtidSet();
                 }
                 if (binlogFilename == null) {
                     fetchBinlogFilenameAndPosition();
@@ -592,8 +592,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             ensureEventDataDeserializer(EventType.ROTATE, RotateEventDataDeserializer.class);
             synchronized (gtidSetAccessLock) {
                 if (gtidSet != null) {
-                    ensureEventDataDeserializer(EventType.GTID, GtidEventDataDeserializer.class);
-                    ensureEventDataDeserializer(EventType.QUERY, QueryEventDataDeserializer.class);
+                    ensureGtidEventDataDeserializer();
                 }
             }
             listenForEventPackets();
@@ -666,7 +665,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         };
     }
 
-    private void checkError(byte[] packet) throws IOException {
+    protected void checkError(byte[] packet) throws IOException {
         if (packet[0] == (byte) 0xFF /* error */) {
             byte[] bytes = Arrays.copyOfRange(packet, 1, packet.length);
             ErrorPacket errorPacket = new ErrorPacket(bytes);
@@ -710,7 +709,6 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         return false;
     }
 
-
     private void enableHeartbeat() throws IOException {
         channel.write(new QueryCommand("set @master_heartbeat_period=" + heartbeatInterval * 1000000));
         byte[] statementResult = channel.read();
@@ -725,7 +723,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
     }
 
-    private void requestBinaryLogStream() throws IOException {
+    protected void requestBinaryLogStream() throws IOException {
         long serverId = blocking ? this.serverId : 0; // http://bugs.mysql.com/bug.php?id=71178
         Command dumpBinaryLogCommand;
         synchronized (gtidSetAccessLock) {
@@ -741,7 +739,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         channel.write(dumpBinaryLogCommand);
     }
 
-    private void ensureEventDataDeserializer(EventType eventType,
+    protected void ensureEventDataDeserializer(EventType eventType,
              Class<? extends EventDataDeserializer> eventDataDeserializerClass) {
         EventDataDeserializer eventDataDeserializer = eventDeserializer.getEventDataDeserializer(eventType);
         if (eventDataDeserializer.getClass() != eventDataDeserializerClass &&
@@ -758,6 +756,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
     }
 
+    protected void ensureGtidEventDataDeserializer() {
+        ensureEventDataDeserializer(EventType.GTID, GtidEventDataDeserializer.class);
+        ensureEventDataDeserializer(EventType.QUERY, QueryEventDataDeserializer.class);
+    }
 
     private void spawnKeepAliveThread() {
         final ExecutorService threadExecutor =
@@ -902,6 +904,14 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         return "";
     }
 
+    protected void setupGtidSet() throws IOException{
+        synchronized (gtidSetAccessLock) {
+            if (gtidSet != null && "".equals(gtidSet.toString()) && gtidSetFallbackToPurged) {
+                gtidSet = new GtidSet(fetchGtidPurged());
+            }
+        }
+    }
+
     private void fetchBinlogFilenameAndPosition() throws IOException {
         ResultSetRowPacket[] resultSet;
         channel.write(new QueryCommand("show master status"));
@@ -1003,7 +1013,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         return result;
     }
 
-    private void updateClientBinlogFilenameAndPosition(Event event) {
+    protected void updateClientBinlogFilenameAndPosition(Event event) {
         EventHeader eventHeader = event.getHeader();
         EventType eventType = eventHeader.getEventType();
         if (eventType == EventType.ROTATE) {
@@ -1022,7 +1032,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
     }
 
-    private void updateGtidSet(Event event) {
+    protected void updateGtidSet(Event event) {
         synchronized (gtidSetAccessLock) {
             if (gtidSet == null) {
                 return;
@@ -1034,6 +1044,15 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 GtidEventData gtidEventData = (GtidEventData) EventDataWrapper.internal(event.getData());
                 gtid = gtidEventData.getGtid();
                 break;
+            case MARIADB_GTID:
+                MariadbGtidEventData mariadbGtidEventData =  (MariadbGtidEventData) EventDataWrapper.internal(event.getData());
+                mariadbGtidEventData.setServerId(eventHeader.getServerId());
+                gtid = mariadbGtidEventData.toString();
+                break;
+            case MARIADB_GTID_LIST:
+                MariadbGtidListEventData mariadbGtidListEventData =  (MariadbGtidListEventData) EventDataWrapper.internal(event.getData());
+                gtid = mariadbGtidListEventData.getMariaGTIDSet().toString();
+                break;
             case XID:
                 commitGtid();
                 tx = false;
@@ -1044,18 +1063,31 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 if (sql == null) {
                     break;
                 }
-                if ("BEGIN".equals(sql)) {
-                    tx = true;
-                } else
-                if ("COMMIT".equals(sql) || "ROLLBACK".equals(sql)) {
-                    commitGtid();
-                    tx = false;
-                } else
-                if (!tx) {
-                    // auto-commit query, likely DDL
-                    commitGtid();
+                commitGtid(sql);
+                break;
+            case ANNOTATE_ROWS:
+                AnnotateRowsEventData annotateRowsEventData = (AnnotateRowsEventData) EventDeserializer.EventDataWrapper.internal(event.getData());
+                sql = annotateRowsEventData.getRowsQuery();
+                if (sql == null) {
+                    break;
                 }
+                commitGtid(sql);
+                break;
             default:
+        }
+    }
+
+    protected void commitGtid(String sql) {
+        if ("BEGIN".equals(sql)) {
+            tx = true;
+        } else
+        if ("COMMIT".equals(sql) || "ROLLBACK".equals(sql)) {
+            commitGtid();
+            tx = false;
+        } else
+        if (!tx) {
+            // auto-commit query, likely DDL
+            commitGtid();
         }
     }
 
