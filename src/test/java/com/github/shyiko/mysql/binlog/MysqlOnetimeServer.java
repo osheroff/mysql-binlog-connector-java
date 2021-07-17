@@ -63,6 +63,11 @@ public class MysqlOnetimeServer {
 			authPlugin = "--default-authentication-plugin=mysql_native_password";
 		}
 
+		String fullRowMetaData = "";
+		if ( getVersion().atLeast(8, 0) && options.fullRowMetaData ) {
+			fullRowMetaData = "--binlog-row-metadata=FULL";
+		}
+
 		ProcessBuilder pb = new ProcessBuilder(
 			dir + "/src/test/onetimeserver",
 			"--mysql-version=" + getVersionString(),
@@ -74,6 +79,7 @@ public class MysqlOnetimeServer {
 			"--character-set-server=utf8",
 			"--sync_binlog=0",
 			"--default-time-zone=+00:00",
+			fullRowMetaData,
 			isRoot ? "--user=root" : "",
 			authPlugin,
 			gtidParams

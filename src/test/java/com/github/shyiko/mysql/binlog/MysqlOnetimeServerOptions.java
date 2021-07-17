@@ -5,4 +5,5 @@ public class MysqlOnetimeServerOptions {
     public boolean gtid = false;
     public MysqlOnetimeServer masterServer;
     public String extraParams;
+    public boolean fullRowMetaData;
 }

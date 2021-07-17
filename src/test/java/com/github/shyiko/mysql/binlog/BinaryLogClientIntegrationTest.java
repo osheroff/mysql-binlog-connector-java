@@ -115,7 +115,9 @@ public class BinaryLogClientIntegrationTest {
     protected MysqlVersion mysqlVersion;
 
     protected MysqlOnetimeServerOptions getOptions() {
-        return null;
+        MysqlOnetimeServerOptions options = new MysqlOnetimeServerOptions();
+        options.fullRowMetaData = true;
+        return options;
     }
 
     @BeforeClass
@@ -1138,6 +1140,21 @@ public class BinaryLogClientIntegrationTest {
                 assertEquals(client.getMasterServerId(), rs.getLong("@@server_id"));
             }
         });
+    }
+
+    @Test
+    public void testMySQL8InvisibleColumn() throws Exception {
+        if ( !mysqlVersion.atLeast(8, 0) )
+            throw new SkipException("skipping mysql8 invisible column test");
+
+        master.execute("drop table if exists test_invisible_column");
+        master.execute("create table test_invisible_column (\n"
+                + "id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,\n"
+                + "name varchar(100) not null,\n"
+                + "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP INVISIBLE\n"
+                + ");");
+        master.execute("insert into test_invisible_column (name) values ('User 1')");
+        eventListener.waitFor(WriteRowsEventData.class, 1, DEFAULT_TIMEOUT);
     }
 
     @AfterMethod
