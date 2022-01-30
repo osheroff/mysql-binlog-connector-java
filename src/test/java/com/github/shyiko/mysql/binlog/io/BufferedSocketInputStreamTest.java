@@ -45,4 +45,17 @@ public class BufferedSocketInputStreamTest {
         assertEquals(in.read(), 16);
         assertEquals(in.read(), (byte) -1);
     }
+
+    @Test
+    public void testReadToTheEnd() throws Exception {
+        BufferedSocketInputStream in = new BufferedSocketInputStream(new ByteArrayInputStream(new byte[]{
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}), 20);
+        assertEquals(in.read(), 0);
+        assertEquals(in.read(), 1);
+        byte[] buf = new byte[6];
+        assertEquals(in.read(buf, 0, buf.length), 6);
+        assertEquals(in.read(buf, 0, buf.length), 6);
+        assertEquals(in.read(buf, 0, buf.length), 3); // only 3 bytes left in stream
+        assertEquals(in.read(buf, 0, buf.length), -1); // got the end of stream, so return -1
+    }
 }
