@@ -44,11 +44,7 @@ public class MariadbGtidSet extends GtidSet {
         }
     }
 
-    static String threeDashes = "\\d{1,10}-\\d{1,10}-\\d{1,20}";
-
-    static Pattern MARIA_GTID_PATTERN = Pattern.compile(
-        "^" + threeDashes + "(\\s*,\\s*" + threeDashes + ")*$"
-    );
+    static Pattern MARIA_GTID_PATTERN = Pattern.compile("^\\d+-\\d+-\\d+(?!.*:)");
 
     public static boolean isMariaGtidSet(String gtidSet) {
         return MARIA_GTID_PATTERN.matcher(gtidSet).find();
