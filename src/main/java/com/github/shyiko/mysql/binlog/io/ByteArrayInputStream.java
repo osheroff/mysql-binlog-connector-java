@@ -48,8 +48,14 @@ public class ByteArrayInputStream extends InputStream {
      */
     public int readInteger(int length) throws IOException {
         int result = 0;
+        // for (int i = 0; i < length; ++i) {
+        //     result |= (this.read() << (i << 3));
+        // }
+
+        // reduce the number of read calls and improve performance
+        byte[] bytes = read(length);
         for (int i = 0; i < length; ++i) {
-            result |= (this.read() << (i << 3));
+            result |= ((bytes[i] & 0xff) << (i << 3));
         }
         return result;
     }
@@ -62,8 +68,14 @@ public class ByteArrayInputStream extends InputStream {
      */
     public long readLong(int length) throws IOException {
         long result = 0;
+        // for (int i = 0; i < length; ++i) {
+        //     result |= (((long) this.read()) << (i << 3));
+        // }
+
+        // reduce the number of read calls and improve performance
+        byte[] bytes = read(length);
         for (int i = 0; i < length; ++i) {
-            result |= (((long) this.read()) << (i << 3));
+            result |= (((long) (bytes[i] & 0xff)) << (i << 3));
         }
         return result;
     }
