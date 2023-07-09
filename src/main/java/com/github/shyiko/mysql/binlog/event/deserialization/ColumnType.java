@@ -45,6 +45,9 @@ public enum ColumnType {
     TIMESTAMP_V2(17),
     DATETIME_V2(18),
     TIME_V2(19),
+    // MYSQL_TYPE_TYPED_ARRAY data type appeared in MySQL 8.0.18+
+    // @see https://github.com/mysql/mysql-server/commit/9082b6a820f3948fd563cc32a050f5e8775f2855
+    TYPED_ARRAY(20),
     JSON(245),
     NEWDECIMAL(246),
     ENUM(247),

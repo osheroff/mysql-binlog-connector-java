@@ -21,6 +21,8 @@ import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
 import java.io.IOException;
 
+import static com.github.shyiko.mysql.binlog.event.deserialization.ColumnType.TYPED_ARRAY;
+
 /**
  * @author <a href="mailto:stanley.shyiko@gmail.com">Stanley Shyiko</a>
  */
@@ -79,7 +81,12 @@ public class TableMapEventDataDeserializer implements EventDataDeserializer<Tabl
     private int[] readMetadata(ByteArrayInputStream inputStream, byte[] columnTypes) throws IOException {
         int[] metadata = new int[columnTypes.length];
         for (int i = 0; i < columnTypes.length; i++) {
-            switch(ColumnType.byCode(columnTypes[i] & 0xFF)) {
+            ColumnType columnType = ColumnType.byCode(columnTypes[i] & 0xFF);
+            if (columnType == TYPED_ARRAY) {
+                byte[] arrayType = inputStream.read(1);
+                columnType = ColumnType.byCode(arrayType[0] & 0xFF);
+            }
+            switch(columnType) {
                 case FLOAT:
                 case DOUBLE:
                 case BLOB:
