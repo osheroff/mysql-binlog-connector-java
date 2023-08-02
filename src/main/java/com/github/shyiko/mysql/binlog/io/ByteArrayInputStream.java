@@ -28,7 +28,7 @@ public class ByteArrayInputStream extends InputStream {
     private InputStream inputStream;
     private int peek = -1;
     private int pos, markPosition;
-    private int blockLength = -1;
+    private int blockLength = -1, markBlockLength = -1;
     private int initialBlockLength = -1;
 
     public ByteArrayInputStream(InputStream inputStream) {
@@ -294,6 +294,7 @@ public class ByteArrayInputStream extends InputStream {
     @Override
     public synchronized void mark(int readlimit) {
         markPosition = pos;
+        markBlockLength = blockLength;
         inputStream.mark(readlimit);
     }
 
@@ -305,6 +306,7 @@ public class ByteArrayInputStream extends InputStream {
     @Override
     public synchronized void reset() throws IOException {
         pos = markPosition;
+        blockLength = markBlockLength;
         inputStream.reset();
     }
 
