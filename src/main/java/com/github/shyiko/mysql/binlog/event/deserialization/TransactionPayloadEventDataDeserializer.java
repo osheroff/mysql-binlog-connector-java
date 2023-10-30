@@ -34,6 +34,13 @@ public class TransactionPayloadEventDataDeserializer implements EventDataDeseria
     public static final int OTW_PAYLOAD_COMPRESSION_TYPE_FIELD = 2;
     public static final int OTW_PAYLOAD_UNCOMPRESSED_SIZE_FIELD = 3;
 
+    private EventDeserializer customEventDeserializer;
+
+    public TransactionPayloadEventDataDeserializer customizeEventDeserializer(EventDeserializer eventDeserializer) {
+        this.customEventDeserializer = eventDeserializer;
+        return this;
+    }
+
     @Override
     public TransactionPayloadEventData deserialize(ByteArrayInputStream inputStream) throws IOException {
         TransactionPayloadEventData eventData = new TransactionPayloadEventData();
@@ -86,7 +93,7 @@ public class TransactionPayloadEventDataDeserializer implements EventDataDeseria
 
         // Read and store events from decompressed byte array into input stream
         ArrayList<Event> decompressedEvents = new ArrayList<>();
-        EventDeserializer transactionPayloadEventDeserializer = new EventDeserializer();
+        EventDeserializer transactionPayloadEventDeserializer = obtainEventDeserializer();
         ByteArrayInputStream destinationInputStream = new ByteArrayInputStream(dst);
 
         Event internalEvent = transactionPayloadEventDeserializer.nextEvent(destinationInputStream);
@@ -99,4 +106,9 @@ public class TransactionPayloadEventDataDeserializer implements EventDataDeseria
 
         return eventData;
     }
+
+    protected EventDeserializer obtainEventDeserializer() {
+        return this.customEventDeserializer != null ? this.customEventDeserializer : new EventDeserializer();
+    }
+
 }

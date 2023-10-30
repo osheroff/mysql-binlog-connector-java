@@ -130,7 +130,7 @@ public class EventDeserializer {
         eventDataDeserializers.put(EventType.MARIADB_GTID_LIST,
             new MariadbGtidListEventDataDeserializer());
         eventDataDeserializers.put(EventType.TRANSACTION_PAYLOAD,
-                new TransactionPayloadEventDataDeserializer());
+                new TransactionPayloadEventDataDeserializer().customizeEventDeserializer(this));
     }
 
     public void setEventDataDeserializer(EventType eventType, EventDataDeserializer eventDataDeserializer) {
