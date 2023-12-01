@@ -122,6 +122,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     // https://dev.mysql.com/doc/internals/en/sending-more-than-16mbyte.html
     private static final int MAX_PACKET_LENGTH = 16777215;
+    // https://mariadb.com/kb/en/fake-rotate_event/
+    // https://github.com/mysql/mysql-server/blob/87307d4ddd88405117e3f1e51323836d57ab1f57/sql/log_event.h#L276
+    // https://github.com/mysql/mysql-server/blob/87307d4ddd88405117e3f1e51323836d57ab1f57/sql/rpl_binlog_sender.cc#L1056
+    private static final int LOG_EVENT_ARTIFICIAL_F = 0x20;
 
     private final Logger logger = Logger.getLogger(getClass().getName());
 
@@ -174,6 +178,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     private final Lock keepAliveThreadExecutorLock = new ReentrantLock();
     private boolean useSendAnnotateRowsEvent;
 
+    private boolean dispatchArtificialEvents = true;
 
     private Boolean isMariaDB;
     private int mariaDbSlaveCapability = 4;
@@ -522,6 +527,19 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         this.threadFactory = threadFactory;
     }
 
+    /**
+     * @return true/false depending on whether artificial events are dispatched to event listeners
+     */
+    public boolean getDispatchArtificialEvents() {
+        return dispatchArtificialEvents;
+    }
+
+    /**
+     * @param dispatchArtificialEvents true/false to specify whether artificial events are dispatched to event listeners
+     */
+    public void setDispatchArtificialEvents(boolean dispatchArtificialEvents) {
+        this.dispatchArtificialEvents = dispatchArtificialEvents;
+    }
 
     /**
      * @return true/false depending on whether we've connected to MariaDB.  NULL if not connected.
@@ -1086,7 +1104,9 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 if (isConnected()) {
                     eventLastSeen = System.currentTimeMillis();
                     updateGtidSet(event);
-                    notifyEventListeners(event);
+                    if (dispatchArtificialEvents || !isArtificialEvent(event)) {
+                        notifyEventListeners(event);
+                    }
                     updateClientBinlogFilenameAndPosition(event);
                 }
             }
@@ -1105,6 +1125,18 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 }
             }
         }
+    }
+
+    private boolean isArtificialEvent(Event event) {
+        // MySQL and MariaDB will occasionally send events that are considered LOG_ARTIFICIAL_F,
+        // which are events that are injected into the event stream to provide state to the
+        // client but are not within the binlog. This checks whether the specified event is one.
+        EventHeader eventHeader = event.getHeader();
+        if (eventHeader instanceof EventHeaderV4) {
+            EventHeaderV4 flagCompatibleHeader = (EventHeaderV4) eventHeader;
+            return (flagCompatibleHeader.getFlags() & LOG_EVENT_ARTIFICIAL_F) != 0;
+        }
+        return false;
     }
 
     private byte[] readPacketSplitInChunks(ByteArrayInputStream inputStream, int packetLength) throws IOException {
