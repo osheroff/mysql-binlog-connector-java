@@ -1,4 +1,8 @@
 # Changelog
+## [0.29.2](https://github.com/osheroff/mysql-binlog-connector-java/compare/0.29.2...0.29.1) - 2024-04-22
+
+- avoid SSL deadlocks using opt-in SO_LINGER with value of 0
+
 ## [0.29.1] - 2024-03-24
 
 - bug fixes for VERY long transactions
