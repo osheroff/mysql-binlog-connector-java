@@ -125,6 +125,7 @@ public class TableMapEventMetadataDeserializer {
                     break;
                 case ENUM_AND_SET_COLUMN_CHARSET:
                     result.setEnumAndSetColumnCharsets(readIntegers(inputStream));
+                    break;
                 case VISIBILITY:
                     result.setVisibility(readBooleanList(inputStream, nColumns));
                     break;
