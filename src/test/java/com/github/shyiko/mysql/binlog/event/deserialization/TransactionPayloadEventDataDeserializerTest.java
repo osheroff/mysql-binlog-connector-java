@@ -15,15 +15,15 @@
  */
 package com.github.shyiko.mysql.binlog.event.deserialization;
 
-import com.github.shyiko.mysql.binlog.event.EventType;
-import com.github.shyiko.mysql.binlog.event.TransactionPayloadEventData;
-import com.github.shyiko.mysql.binlog.event.XAPrepareEventData;
+import com.github.shyiko.mysql.binlog.event.*;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import org.testng.annotations.Test;
 
 import java.io.IOException;
+import java.io.Serializable;
 
 import static org.testng.Assert.assertEquals;
+import static org.testng.Assert.assertTrue;
 
 /**
  * @author <a href="mailto:somesh.malviya@booking.com">Somesh Malviya</a>
@@ -82,6 +82,8 @@ public class TransactionPayloadEventDataDeserializerTest {
           .append("]}")
           .toString();
 
+    private static final byte[] UNCOMPRESSED_UPDATE_EVENT_BEFORE_ROW_0_BYTE_ARRAY = new byte[] {1, 0, 0, 0};
+
     @Test
     public void deserialize() throws IOException {
         TransactionPayloadEventDataDeserializer deserializer = new TransactionPayloadEventDataDeserializer();
@@ -97,4 +99,62 @@ public class TransactionPayloadEventDataDeserializerTest {
           assertEquals(EventType.XID, transactionPayloadEventData.getUncompressedEvents().get(3).getHeader().getEventType());
           assertEquals(UNCOMPRESSED_UPDATE_EVENT, transactionPayloadEventData.getUncompressedEvents().get(2).getData().toString());
     }
+
+    @Test
+    public void deserializeUsingEventDeserializer() throws IOException {
+
+        ByteArrayInputStream dataStream = new ByteArrayInputStream(DATA);
+
+        // Mock create target TransactionPayloadEventData DATA event header
+        final EventHeaderV4 eventHeader = new EventHeaderV4();
+        eventHeader.setEventType(EventType.TRANSACTION_PAYLOAD);
+        eventHeader.setEventLength(DATA.length + 19L);
+        eventHeader.setTimestamp(1646406641000L);
+        eventHeader.setServerId(223344);
+
+
+        EventHeaderDeserializer eventHeaderDeserializer = new EventHeaderDeserializer() {
+
+            private long count = 0L;
+
+            private EventHeaderDeserializer defaultEventHeaderDeserializer = new EventHeaderV4Deserializer();
+
+            @Override
+            public EventHeader deserialize(ByteArrayInputStream inputStream) throws IOException {
+                if (count > 0) {
+                    // uncompressed event header deserialize
+                    return defaultEventHeaderDeserializer.deserialize(inputStream);
+                }
+                count++;
+                // we need to return target TransactionPayloadEventData DATA event header we had mocked
+                return eventHeader;
+            }
+        };
+
+        EventDeserializer eventDeserializer = new EventDeserializer(eventHeaderDeserializer, new NullEventDataDeserializer());
+        eventDeserializer.setCompatibilityMode(EventDeserializer.CompatibilityMode.INTEGER_AS_BYTE_ARRAY);
+
+        Event event = eventDeserializer.nextEvent(dataStream);
+
+        assertTrue(event.getHeader().getEventType() == EventType.TRANSACTION_PAYLOAD);
+        assertTrue(event.getData() instanceof TransactionPayloadEventData);
+
+        TransactionPayloadEventData transactionPayloadEventData = event.getData();
+        assertEquals(COMPRESSION_TYPE, transactionPayloadEventData.getCompressionType());
+        assertEquals(PAYLOAD_SIZE, transactionPayloadEventData.getPayloadSize());
+        assertEquals(UNCOMPRESSED_SIZE, transactionPayloadEventData.getUncompressedSize());
+        assertEquals(NUMBER_OF_UNCOMPRESSED_EVENTS, transactionPayloadEventData.getUncompressedEvents().size());
+        assertEquals(EventType.QUERY, transactionPayloadEventData.getUncompressedEvents().get(0).getHeader().getEventType());
+        assertEquals(EventType.TABLE_MAP, transactionPayloadEventData.getUncompressedEvents().get(1).getHeader().getEventType());
+        assertEquals(EventType.EXT_UPDATE_ROWS, transactionPayloadEventData.getUncompressedEvents().get(2).getHeader().getEventType());
+        assertEquals(EventType.XID, transactionPayloadEventData.getUncompressedEvents().get(3).getHeader().getEventType());
+//        assertEquals(UNCOMPRESSED_UPDATE_EVENT, transactionPayloadEventData.getUncompressedEvents().get(2).getData().toString());
+        assertTrue(transactionPayloadEventData.getUncompressedEvents().get(2).getData() instanceof UpdateRowsEventData);
+
+        UpdateRowsEventData updateRowsEventData = transactionPayloadEventData.getUncompressedEvents().get(2).getData();
+        assertEquals(1, updateRowsEventData.getRows().size());
+        Serializable[] updateBefore = updateRowsEventData.getRows().get(0).getKey();
+        assertEquals(UNCOMPRESSED_UPDATE_EVENT_BEFORE_ROW_0_BYTE_ARRAY, updateBefore[0]);
+    }
+
 }
