@@ -122,6 +122,13 @@ public class PacketChannel implements Channel {
 
     @Override
     public void close() throws IOException {
+        if (shouldUseSoLinger0) {
+            try {
+                socket.setSoLinger(true, 0);
+            } catch (SocketException e) {
+                // ignore
+            }
+        }
         try {
             socket.shutdownInput(); // for socketInputStream.setEOF(true)
         } catch (Exception e) {
@@ -131,13 +138,6 @@ public class PacketChannel implements Channel {
             socket.shutdownOutput();
         } catch (Exception e) {
             // ignore
-        }
-        if (shouldUseSoLinger0) {
-            try {
-                socket.setSoLinger(true, 0);
-            } catch (SocketException e) {
-                // ignore
-            }
         }
         socket.close();
         shouldUseSoLinger0 = false;
