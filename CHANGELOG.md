@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.30.1](https://github.com/osheroff/mysql-binlog-connector-java/compare/0.30.1...0.30.0) - 2024-10-25
+
+- "hot" fix -- #136
+
 ## [0.30.0](https://github.com/osheroff/mysql-binlog-connector-java/compare/0.30.0...0.29.2) - 2024-08-14
 
 - Add support for MySQL 8.4
