@@ -130,7 +130,25 @@ public class EventDeserializer {
         eventDataDeserializers.put(EventType.MARIADB_GTID_LIST,
             new MariadbGtidListEventDataDeserializer());
         eventDataDeserializers.put(EventType.TRANSACTION_PAYLOAD,
-                new TransactionPayloadEventDataDeserializer());
+                new TransactionPayloadEventDataDeserializer().customizeEventDeserializerSupplier(new TransactionPayloadEventDataDeserializer.Supplier<EventDeserializer>() {
+                    @Override
+                    public EventDeserializer get() {
+                        EventDeserializer eventDeserializer = new EventDeserializer(
+                            eventHeaderDeserializer,
+                            defaultEventDataDeserializer,
+                            eventDataDeserializers,
+                            tableMapEventByTableId
+                        );
+
+                        if (!compatibilitySet.isEmpty()) {
+                            CompatibilityMode[] compatibilityModeSettings  = new CompatibilityMode[compatibilitySet.size()];
+                            compatibilitySet.toArray(compatibilityModeSettings);
+                            eventDeserializer.setCompatibilityMode(compatibilityModeSettings[0], compatibilityModeSettings);
+                        }
+
+                        return eventDeserializer;
+                    }
+                }));
     }
 
     public void setEventDataDeserializer(EventType eventType, EventDataDeserializer eventDataDeserializer) {
