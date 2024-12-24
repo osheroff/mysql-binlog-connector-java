@@ -1336,7 +1336,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
             keepAliveThreadExecutorLock.unlock();
         }
         while (!awaitTerminationInterruptibly(keepAliveThreadExecutor,
-            Long.MAX_VALUE, TimeUnit.NANOSECONDS)) {
+            10, TimeUnit.MILLISECONDS)) {
             // ignore
         }
     }
