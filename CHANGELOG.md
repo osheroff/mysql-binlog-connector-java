@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.30.2](https://github.com/osheroff/mysql-binlog-connector-java/compare/0.30.2...0.30.1) - 2025-08-04
+
+- bump dep
+
 ## [0.30.1](https://github.com/osheroff/mysql-binlog-connector-java/compare/0.30.1...0.30.0) - 2024-10-25
 
 - "hot" fix -- #136
