@@ -23,6 +23,8 @@ import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Objects;
+import java.util.function.Supplier;
 
 /**
  * @author <a href="mailto:somesh.malviya@booking.com">Somesh Malviya</a>
@@ -33,6 +35,16 @@ public class TransactionPayloadEventDataDeserializer implements EventDataDeseria
     public static final int OTW_PAYLOAD_SIZE_FIELD = 1;
     public static final int OTW_PAYLOAD_COMPRESSION_TYPE_FIELD = 2;
     public static final int OTW_PAYLOAD_UNCOMPRESSED_SIZE_FIELD = 3;
+
+    private final Supplier<EventDeserializer> transactionPayloadEventDeserializerProvider;
+
+    public TransactionPayloadEventDataDeserializer() {
+        this(EventDeserializer::new);
+    }
+
+    public TransactionPayloadEventDataDeserializer(Supplier<EventDeserializer> transactionPayloadEventDeserializerProvider) {
+        this.transactionPayloadEventDeserializerProvider = Objects.requireNonNull(transactionPayloadEventDeserializerProvider);
+    }
 
     @Override
     public TransactionPayloadEventData deserialize(ByteArrayInputStream inputStream) throws IOException {
@@ -86,7 +98,7 @@ public class TransactionPayloadEventDataDeserializer implements EventDataDeseria
 
         // Read and store events from decompressed byte array into input stream
         ArrayList<Event> decompressedEvents = new ArrayList<>();
-        EventDeserializer transactionPayloadEventDeserializer = new EventDeserializer();
+        EventDeserializer transactionPayloadEventDeserializer = transactionPayloadEventDeserializerProvider.get();
         ByteArrayInputStream destinationInputStream = new ByteArrayInputStream(dst);
 
         Event internalEvent = transactionPayloadEventDeserializer.nextEvent(destinationInputStream);
