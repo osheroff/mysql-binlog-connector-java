@@ -50,8 +50,10 @@ public class DefaultSSLSocketFactory implements SSLSocketFactory {
             throw new SocketException(e.getMessage());
         }
         try {
-            return (SSLSocket) sc.getSocketFactory()
+            SSLSocket sslSocket = (SSLSocket) sc.getSocketFactory()
                 .createSocket(socket, socket.getInetAddress().getHostName(), socket.getPort(), true);
+            sslSocket.setSoTimeout(5 * 60 * 1000);
+            return sslSocket;
         } catch (IOException e) {
             throw new SocketException(e.getMessage());
         }
