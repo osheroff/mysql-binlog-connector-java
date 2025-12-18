@@ -15,18 +15,18 @@
  */
 package com.github.shyiko.mysql.binlog.event.deserialization;
 
-import com.github.luben.zstd.Zstd;
+import com.github.luben.zstd.ZstdInputStream;
 import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.TransactionPayloadEventData;
 import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
 /**
  * @author <a href="mailto:somesh.malviya@booking.com">Somesh Malviya</a>
  * @author <a href="mailto:debjeet.sarkar@booking.com">Debjeet Sarkar</a>
+ * @author <a href="mailto:pratik.pandey@booking.com">Pratik Pandey</a>
  */
 public class TransactionPayloadEventDataDeserializer implements EventDataDeserializer<TransactionPayloadEventData> {
     public static final int OTW_PAYLOAD_HEADER_END_MARK = 0;
@@ -49,14 +49,15 @@ public class TransactionPayloadEventDataDeserializer implements EventDataDeseria
             if (fieldType == OTW_PAYLOAD_HEADER_END_MARK) {
                 break;
             }
-            // Read the size of the field
+            // Read the size of the field (use readPackedLong to support large field sizes)
             if (inputStream.available() >= 1) {
-                fieldLen = inputStream.readPackedInteger();
+                long fieldLenLong = inputStream.readPackedLong();
+                fieldLen = (int) fieldLenLong;
             }
             switch (fieldType) {
                 case OTW_PAYLOAD_SIZE_FIELD:
                     // Fetch the payload size
-                    eventData.setPayloadSize(inputStream.readPackedInteger());
+                    eventData.setPayloadSize(inputStream.readPackedLong());
                     break;
                 case OTW_PAYLOAD_COMPRESSION_TYPE_FIELD:
                     // Fetch the compression type
@@ -64,7 +65,7 @@ public class TransactionPayloadEventDataDeserializer implements EventDataDeseria
                     break;
                 case OTW_PAYLOAD_UNCOMPRESSED_SIZE_FIELD:
                     // Fetch the uncompressed size
-                    eventData.setUncompressedSize(inputStream.readPackedInteger());
+                    eventData.setUncompressedSize(inputStream.readPackedLong());
                     break;
                 default:
                     // Ignore unrecognized field
@@ -76,27 +77,35 @@ public class TransactionPayloadEventDataDeserializer implements EventDataDeseria
             // Default the uncompressed to the payload size
             eventData.setUncompressedSize(eventData.getPayloadSize());
         }
-        // set the payload to the rest of the input buffer
-        eventData.setPayload(inputStream.read(eventData.getPayloadSize()));
+        // Validate compressed payload size doesn't exceed Java array limit
+        // The compressed payload must fit in a byte array, but the uncompressed size can exceed 2GB
+        // since we use streaming decompression
+        long payloadSize = eventData.getPayloadSize();
+        // Read the compressed payload into memory
+        eventData.setPayload(inputStream.read((int) payloadSize));
 
-        // Decompress the payload
-        byte[] src = eventData.getPayload();
-        byte[] dst = ByteBuffer.allocate(eventData.getUncompressedSize()).array();
-        Zstd.decompressByteArray(dst, 0, dst.length, src, 0, src.length);
-
-        // Read and store events from decompressed byte array into input stream
-        ArrayList<Event> decompressedEvents = new ArrayList<>();
-        EventDeserializer transactionPayloadEventDeserializer = new EventDeserializer();
-        ByteArrayInputStream destinationInputStream = new ByteArrayInputStream(dst);
-
-        Event internalEvent = transactionPayloadEventDeserializer.nextEvent(destinationInputStream);
-        while(internalEvent != null) {
-            decompressedEvents.add(internalEvent);
-            internalEvent = transactionPayloadEventDeserializer.nextEvent(destinationInputStream);
-        }
+        // Use streaming decompression to handle uncompressed sizes up to 4GB
+        // This avoids hitting Java's 2GB array limit by processing events as they're decompressed
+        ArrayList<Event> decompressedEvents = getDecompressedEvents(eventData);
 
         eventData.setUncompressedEvents(decompressedEvents);
 
         return eventData;
+    }
+
+    private static ArrayList<Event> getDecompressedEvents(TransactionPayloadEventData eventData) throws IOException {
+        ArrayList<Event> decompressedEvents = new ArrayList<>();
+        EventDeserializer transactionPayloadEventDeserializer = new EventDeserializer();
+
+        try (ZstdInputStream zstdInputStream = new ZstdInputStream(new java.io.ByteArrayInputStream(eventData.getPayload()))) {
+            ByteArrayInputStream destinationInputStream = new ByteArrayInputStream(zstdInputStream);
+
+            Event internalEvent = transactionPayloadEventDeserializer.nextEvent(destinationInputStream);
+            while(internalEvent != null) {
+                decompressedEvents.add(internalEvent);
+                internalEvent = transactionPayloadEventDeserializer.nextEvent(destinationInputStream);
+            }
+        }
+        return decompressedEvents;
     }
 }

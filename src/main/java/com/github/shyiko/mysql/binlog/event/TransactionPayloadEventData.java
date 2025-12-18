@@ -4,8 +4,8 @@ import java.util.ArrayList;
 
 
 public class TransactionPayloadEventData implements EventData {
-    private int payloadSize;
-    private int uncompressedSize;
+    private long payloadSize;
+    private long uncompressedSize;
     private int compressionType;
     private byte[] payload;
     private ArrayList<Event> uncompressedEvents;
@@ -18,19 +18,19 @@ public class TransactionPayloadEventData implements EventData {
         this.uncompressedEvents = uncompressedEvents;
     }
 
-    public int getPayloadSize() {
+    public long getPayloadSize() {
         return payloadSize;
     }
 
-    public void setPayloadSize(int payloadSize) {
+    public void setPayloadSize(long payloadSize) {
         this.payloadSize = payloadSize;
     }
 
-    public int getUncompressedSize() {
+    public long getUncompressedSize() {
         return uncompressedSize;
     }
 
-    public void setUncompressedSize(int uncompressedSize) {
+    public void setUncompressedSize(long uncompressedSize) {
         this.uncompressedSize = uncompressedSize;
     }
 
