@@ -51,13 +51,12 @@ public class TransactionPayloadEventDataDeserializer implements EventDataDeseria
             }
             // Read the size of the field (use readPackedLong to support large field sizes)
             if (inputStream.available() >= 1) {
-                long fieldLenLong = inputStream.readPackedLong();
-                fieldLen = (int) fieldLenLong;
+                fieldLen = inputStream.readPackedInt();
             }
             switch (fieldType) {
                 case OTW_PAYLOAD_SIZE_FIELD:
                     // Fetch the payload size
-                    eventData.setPayloadSize(inputStream.readPackedLong());
+                    eventData.setPayloadSize(inputStream.readPackedInteger());
                     break;
                 case OTW_PAYLOAD_COMPRESSION_TYPE_FIELD:
                     // Fetch the compression type
@@ -77,12 +76,8 @@ public class TransactionPayloadEventDataDeserializer implements EventDataDeseria
             // Default the uncompressed to the payload size
             eventData.setUncompressedSize(eventData.getPayloadSize());
         }
-        // Validate compressed payload size doesn't exceed Java array limit
-        // The compressed payload must fit in a byte array, but the uncompressed size can exceed 2GB
-        // since we use streaming decompression
-        long payloadSize = eventData.getPayloadSize();
-        // Read the compressed payload into memory
-        eventData.setPayload(inputStream.read((int) payloadSize));
+
+        eventData.setPayload(inputStream.read(eventData.getPayloadSize()));
 
         // Use streaming decompression to handle uncompressed sizes up to 4GB
         // This avoids hitting Java's 2GB array limit by processing events as they're decompressed
