@@ -51,7 +51,7 @@ public class TransactionPayloadEventDataDeserializer implements EventDataDeseria
             }
             // Read the size of the field (use readPackedLong to support large field sizes)
             if (inputStream.available() >= 1) {
-                fieldLen = inputStream.readPackedInt();
+                fieldLen = inputStream.readPackedInteger();
             }
             switch (fieldType) {
                 case OTW_PAYLOAD_SIZE_FIELD:

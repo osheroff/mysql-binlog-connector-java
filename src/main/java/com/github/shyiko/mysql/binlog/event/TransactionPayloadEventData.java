@@ -4,7 +4,7 @@ import java.util.ArrayList;
 
 
 public class TransactionPayloadEventData implements EventData {
-    private long payloadSize;
+    private int payloadSize;
     private long uncompressedSize;
     private int compressionType;
     private byte[] payload;
@@ -18,11 +18,11 @@ public class TransactionPayloadEventData implements EventData {
         this.uncompressedEvents = uncompressedEvents;
     }
 
-    public long getPayloadSize() {
+    public int getPayloadSize() {
         return payloadSize;
     }
 
-    public void setPayloadSize(long payloadSize) {
+    public void setPayloadSize(int payloadSize) {
         this.payloadSize = payloadSize;
     }
 
