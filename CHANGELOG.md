@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.30.3](https://github.com/osheroff/mysql-binlog-connector-java/compare/0.30.3...0.30.2) - 2026-01-05
+
+- Fix situations where an uncompressed event exceeded buffer sizes
+
 ## [0.30.2](https://github.com/osheroff/mysql-binlog-connector-java/compare/0.30.2...0.30.1) - 2025-08-04
 
 - bump dep
