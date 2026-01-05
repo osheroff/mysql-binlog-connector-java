@@ -10,7 +10,7 @@ the "official" version of this.  With help from the Debezium devs.
 <dependency>
     <groupId>com.zendesk</groupId>
     <artifactId>mysql-binlog-connector-java</artifactId>
-    <version>0.25.0</version>
+    <version>0.30.3</version>
 </dependency>
 ```
 
