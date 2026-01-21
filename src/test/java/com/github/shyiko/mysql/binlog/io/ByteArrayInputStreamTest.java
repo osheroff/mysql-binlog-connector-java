@@ -99,4 +99,18 @@ public class ByteArrayInputStreamTest {
         assertEquals(b[0], 5);
         assertEquals(b[2], 7);
     }
+
+    @Test
+    public void testMarkAndReset() throws Exception {
+        ByteArrayInputStream in = new ByteArrayInputStream(new byte[] {1, 2, 3, 4});
+        in.enterBlock(4);
+        in.mark(4);
+        in.readInteger(4);
+        in.reset();
+
+        assertEquals(1, in.read());
+        assertEquals(2, in.read());
+        assertEquals(3, in.read());
+        assertEquals(4, in.read());
+    }
 }
