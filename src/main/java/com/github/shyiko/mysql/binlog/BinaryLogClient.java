@@ -169,6 +169,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private long connectTimeout = TimeUnit.SECONDS.toMillis(3);
 
+    private long netWriteTimeout;
+
+    private long netReadTimeout;
+
     private volatile ExecutorService keepAliveThreadExecutor;
 
     private final Lock connectLock = new ReentrantLock();
@@ -496,6 +500,42 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
     }
 
     /**
+     * @return net_write_timeout in seconds (0 if not set (default)).
+     * @see #setNetWriteTimeout(long)
+     */
+    public long getNetWriteTimeout() {
+        return netWriteTimeout;
+    }
+
+    /**
+     * @param netWriteTimeout net_write_timeout in seconds. Controls how long the server waits for
+     * a write to the client to complete. May need to be increased for large data volumes to avoid
+     * EOFException. 0 means use server default.
+     * @see #getNetWriteTimeout()
+     */
+    public void setNetWriteTimeout(long netWriteTimeout) {
+        this.netWriteTimeout = netWriteTimeout;
+    }
+
+    /**
+     * @return net_read_timeout in seconds (0 if not set (default)).
+     * @see #setNetReadTimeout(long)
+     */
+    public long getNetReadTimeout() {
+        return netReadTimeout;
+    }
+
+    /**
+     * @param netReadTimeout net_read_timeout in seconds. Controls how long the server waits for
+     * a read from the client to complete. May need to be increased for high-latency networks to
+     * avoid EOFException. 0 means use server default.
+     * @see #getNetReadTimeout()
+     */
+    public void setNetReadTimeout(long netReadTimeout) {
+        this.netReadTimeout = netReadTimeout;
+    }
+
+    /**
      * @param eventDeserializer custom event deserializer
      */
     public void setEventDeserializer(EventDeserializer eventDeserializer) {
@@ -680,6 +720,12 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         if (heartbeatInterval > 0) {
             enableHeartbeat();
         }
+        if (netWriteTimeout > 0) {
+            setNetWriteTimeoutOnServer();
+        }
+        if (netReadTimeout > 0) {
+            setNetReadTimeoutOnServer();
+        }
     }
 
     private PacketChannel openChannel() throws IOException {
@@ -773,6 +819,18 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
 
     private void enableHeartbeat() throws IOException {
         channel.write(new QueryCommand("set @master_heartbeat_period=" + heartbeatInterval * 1000000));
+        byte[] statementResult = channel.read();
+        checkError(statementResult);
+    }
+
+    private void setNetWriteTimeoutOnServer() throws IOException {
+        channel.write(new QueryCommand("set net_write_timeout=" + netWriteTimeout));
+        byte[] statementResult = channel.read();
+        checkError(statementResult);
+    }
+
+    private void setNetReadTimeoutOnServer() throws IOException {
+        channel.write(new QueryCommand("set net_read_timeout=" + netReadTimeout));
         byte[] statementResult = channel.read();
         checkError(statementResult);
     }
