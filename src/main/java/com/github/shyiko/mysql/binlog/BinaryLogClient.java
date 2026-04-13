@@ -876,9 +876,10 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         checkError(channel.read());
 
         synchronized (gtidSetAccessLock) {
-            if (this.gtidEnabled) {
-                logger.info(gtidSet.toString());
-                channel.write(new QueryCommand("SET @slave_connect_state = '" + gtidSet.toString() + "'"));
+            String gtidStr = (gtidSet != null) ? gtidSet.toString() : null;
+            if (this.gtidEnabled && gtidStr != null && !gtidStr.isEmpty()) {
+                logger.info(gtidStr);
+                channel.write(new QueryCommand("SET @slave_connect_state = '" + gtidStr + "'"));
                 checkError(channel.read());
                 channel.write(new QueryCommand("SET @slave_gtid_strict_mode = 0"));
                 checkError(channel.read());
@@ -886,6 +887,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
                 checkError(channel.read());
                 dumpBinaryLogCommand = new DumpBinaryLogCommand(serverId, "", 0L, isUseSendAnnotateRowsEvent());
             } else {
+                // gtidSet is null or empty: no known GTID position yet, fall back to binlog file/position
                 dumpBinaryLogCommand = new DumpBinaryLogCommand(serverId, binlogFilename, binlogPosition, isUseSendAnnotateRowsEvent());
             }
         }
