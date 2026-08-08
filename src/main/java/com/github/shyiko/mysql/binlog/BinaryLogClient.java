@@ -1261,7 +1261,7 @@ public class BinaryLogClient implements BinaryLogClientMXBean {
         }
     }
 
-    private void updateClientBinlogFilenameAndPosition(Event event) {
+    protected void updateClientBinlogFilenameAndPosition(Event event) {
         EventHeader eventHeader = event.getHeader();
         EventType eventType = eventHeader.getEventType();
         if (eventType == EventType.ROTATE) {
