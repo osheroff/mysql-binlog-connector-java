@@ -302,18 +302,30 @@ public abstract class AbstractRowsEventDataDeserializer<T extends EventData> imp
 
             + fractional-seconds storage (size depends on meta)
         */
-        long time = bigEndianLong(inputStream.read(3), 0, 3);
-        int fsp = deserializeFractionalSeconds(meta, inputStream);
+        int fractionBytes = (meta + 1) / 2;
+        int payloadBytes = 3 + fractionBytes;
+        int payloadBits = payloadBytes * 8;
+        long time = bigEndianLong(inputStream.read(payloadBytes), 0, payloadBytes);
+        // The leading bit is the sign, and MySQL stores a negative TIME as the two's complement of the
+        // whole packed payload, fractional bytes included. The sign has to come off before any field is
+        // sliced out, and the fractional bytes have to be part of that same complement.
+        boolean negative = bitSlice(time, 0, 1, payloadBits) == 0;
+        if (negative) {
+            time = (~time + 1) & ((1L << payloadBits) - 1);
+        }
+        int fsp = fractionBytes == 0 ? 0 :
+            (int) (bitSlice(time, 24, fractionBytes * 8, payloadBits) * Math.pow(100, 3 - fractionBytes));
         Long timestamp = asUnixTime(1970, 1, 1,
-            bitSlice(time, 2, 10, 24),
-            bitSlice(time, 12, 6, 24),
-            bitSlice(time, 18, 6, 24),
+            bitSlice(time, 2, 10, payloadBits),
+            bitSlice(time, 12, 6, payloadBits),
+            bitSlice(time, 18, 6, payloadBits),
             fsp / 1000
         );
         if (deserializeDateAndTimeAsLong) {
-            return castTimestamp(timestamp, fsp);
+            Long value = castTimestamp(timestamp, fsp);
+            return negative && value != null ? -value : value;
         }
-        return timestamp != null ? new java.sql.Time(timestamp) : null;
+        return timestamp != null ? new java.sql.Time(negative ? -timestamp : timestamp) : null;
     }
 
     protected Serializable deserializeTimestamp(ByteArrayInputStream inputStream) throws IOException {
