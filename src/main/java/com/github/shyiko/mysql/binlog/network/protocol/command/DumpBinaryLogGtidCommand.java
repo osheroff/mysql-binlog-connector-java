@@ -19,6 +19,7 @@ import com.github.shyiko.mysql.binlog.GtidSet;
 import com.github.shyiko.mysql.binlog.io.ByteArrayOutputStream;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 
 /**
@@ -47,7 +48,16 @@ public class DumpBinaryLogGtidCommand implements Command {
         buffer.writeInteger(this.binlogFilename.length(), 4);
         buffer.writeString(this.binlogFilename);
         buffer.writeLong(this.binlogPosition, 8);
-        Collection<GtidSet.UUIDSet> uuidSets = gtidSet.getUUIDSets();
+        // COM_BINLOG_DUMP_GTID has no field for MySQL 8.4 GTID tags, so tagged sets are omitted rather than sent
+        // under their bare uuid (which would tell the source we already hold untagged transactions we do not,
+        // causing it to skip them). This matches the server's own MYSQL_RPL_SKIP_TAGGED_GTIDS behaviour for
+        // clients that predate tagged GTIDs; the source simply re-sends the tagged transactions.
+        Collection<GtidSet.UUIDSet> uuidSets = new ArrayList<GtidSet.UUIDSet>();
+        for (GtidSet.UUIDSet uuidSet : gtidSet.getUUIDSets()) {
+            if (!uuidSet.isTagged()) {
+                uuidSets.add(uuidSet);
+            }
+        }
         int dataSize = 8 /* number of uuidSets */;
         for (GtidSet.UUIDSet uuidSet : uuidSets) {
             dataSize += 16 /* uuid */ + 8 /* number of intervals */ +
