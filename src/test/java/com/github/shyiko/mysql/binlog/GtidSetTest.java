@@ -184,4 +184,77 @@ public class GtidSetTest {
         GtidSet gtidSet = new GtidSet("");
         gtidSet.addGtid(MariadbGtidSet.MariaGtid.parse("1-2-3"));
     }
+
+    // MySQL 8.4 tagged GTIDs (WL#15294): uuid_set: uuid:[tag:]interval[:[tag:]interval]...
+
+    @Test
+    public void testParseTaggedGtidSet() {
+        GtidSet gtidSet = new GtidSet(UUID + ":mysqlsh:1-42");
+        UUIDSet uuidSet = gtidSet.getUUIDSet(UUID + ":mysqlsh");
+        assertEquals(uuidSet.getTag(), "mysqlsh");
+        assertTrue(uuidSet.isTagged());
+        assertEquals(uuidSet.getIntervals(), new LinkedList<Interval>() {{ add(new Interval(1, 42)); }});
+        assertEquals(gtidSet.toString(), UUID + ":mysqlsh:1-42");
+    }
+
+    @Test
+    public void testParseUntaggedAndTaggedIntervalsOfSameServer() {
+        // the tag applies to every interval that follows it, until the next tag
+        String gtids = UUID + ":1-5:tag_a:1-3:15-21:tag_b:8-52";
+        GtidSet gtidSet = new GtidSet(gtids);
+        assertEquals(gtidSet.getUUIDSets().size(), 3);
+        assertEquals(gtidSet.getUUIDSet(UUID).getTag(), "");
+        assertEquals(gtidSet.getUUIDSet(UUID).getIntervals().size(), 1);
+        assertEquals(gtidSet.getUUIDSet(UUID + ":tag_a").getIntervals().size(), 2);
+        assertEquals(gtidSet.getUUIDSet(UUID + ":tag_b").getIntervals(),
+            new LinkedList<Interval>() {{ add(new Interval(8, 52)); }});
+        assertEquals(gtidSet.toString(), gtids);
+    }
+
+    @Test
+    public void testTaggedSetsOfSameServerAreDistinct() {
+        GtidSet gtidSet = new GtidSet(UUID + ":tag_a:1-3:tag_b:1-3");
+        assertEquals(gtidSet.getUUIDSets().size(), 2);
+        assertNotEquals(gtidSet.getUUIDSet(UUID + ":tag_a"), gtidSet.getUUIDSet(UUID + ":tag_b"));
+        // an untagged set is not the same transaction group as a tagged one with identical intervals
+        assertNotEquals(new GtidSet(UUID + ":1-3"), new GtidSet(UUID + ":tag_a:1-3"));
+    }
+
+    @Test
+    public void testTaggedGtidSetIsContainedWithin() {
+        assertTrue(new GtidSet(UUID + ":tag_a:1-3")
+            .isContainedWithin(new GtidSet(UUID + ":tag_a:1-10")));
+        // same intervals but a different tag is not containment
+        assertTrue(!new GtidSet(UUID + ":tag_a:1-3")
+            .isContainedWithin(new GtidSet(UUID + ":tag_b:1-10")));
+        // ... nor is an untagged superset
+        assertTrue(!new GtidSet(UUID + ":tag_a:1-3")
+            .isContainedWithin(new GtidSet(UUID + ":1-10")));
+    }
+
+    @Test
+    public void testTagIsNotConfusedWithInterval() {
+        // a bare "1-3" must never be read as a tag, and a tag must never reach Long.parseLong
+        GtidSet gtidSet = new GtidSet(UUID + ":1-3");
+        assertEquals(gtidSet.getUUIDSet(UUID).getTag(), "");
+        assertEquals(gtidSet.toString(), UUID + ":1-3");
+    }
+
+    @Test
+    public void testMultipleServersWithTags() {
+        String other = "00000000-0000-0000-0000-000000000001";
+        String gtids = UUID + ":mysqlsh:1-42," + other + ":1-9";
+        GtidSet gtidSet = new GtidSet(gtids);
+        assertEquals(gtidSet.getUUIDSets().size(), 2);
+        assertEquals(gtidSet.toString(), gtids);
+    }
+
+    @Test
+    public void testUntaggedParsingIsUnchanged() {
+        // regression guard: untagged behaviour must be byte-identical to the pre-tag implementation
+        String gtids = UUID + ":1-191:192-199";
+        assertEquals(new GtidSet(gtids).toString(), UUID + ":1-199");
+        assertEquals(new GtidSet("").toString(), "");
+        assertEquals(new GtidSet(null).toString(), "");
+    }
 }
