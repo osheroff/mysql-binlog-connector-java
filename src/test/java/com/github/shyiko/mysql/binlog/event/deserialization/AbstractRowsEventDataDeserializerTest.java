@@ -15,10 +15,14 @@
  */
 package com.github.shyiko.mysql.binlog.event.deserialization;
 
+import com.github.shyiko.mysql.binlog.event.TableMapEventData;
 import com.github.shyiko.mysql.binlog.event.deserialization.AbstractRowsEventDataDeserializer.UnixTime;
+import com.github.shyiko.mysql.binlog.io.ByteArrayInputStream;
 import org.testng.annotations.Test;
 
 import java.util.Calendar;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.TimeZone;
 
 import static org.testng.Assert.assertEquals;
@@ -43,6 +47,22 @@ public class AbstractRowsEventDataDeserializerTest {
             timestamp(1582, 10, 14, 0, 0, 0, 0));
         assetTimeEquals(UnixTime.from(1, 1, 1, 0, 0, 0, 0),
             timestamp(1, 1, 1, 0, 0, 0, 0));
+    }
+
+    @Test
+    public void testDeserializeYear() throws Exception {
+        assertEquals(deserializeYear(0), 0);
+        assertEquals(deserializeYear(1), 1901);
+        assertEquals(deserializeYear(100), 2000);
+        assertEquals(deserializeYear(255), 2155);
+    }
+
+    private Object deserializeYear(int value) throws Exception {
+        Map<Long, TableMapEventData> tableMapEventByTableId = new HashMap<Long, TableMapEventData>();
+        AbstractRowsEventDataDeserializer<?> deserializer =
+            new WriteRowsEventDataDeserializer(tableMapEventByTableId);
+        return deserializer.deserializeYear(
+            new ByteArrayInputStream(new byte[] {(byte) value}));
     }
 
     private void assetTimeEquals(long actual, long expected) {
