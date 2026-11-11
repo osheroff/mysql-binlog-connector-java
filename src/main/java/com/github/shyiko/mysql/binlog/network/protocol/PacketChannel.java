@@ -94,14 +94,25 @@ public class PacketChannel implements Channel {
     }
 
     public void upgradeToSSL(SSLSocketFactory sslSocketFactory, HostnameVerifier hostnameVerifier) throws IOException {
+        upgradeToSSL(sslSocketFactory, hostnameVerifier, null);
+    }
+
+    /**
+     * @param host the host name the certificate should be verified against, i.e. the host the client was
+     *             configured with (which may be an IP address). If null, the peer's reverse-resolved
+     *             host name is used (the behavior prior to this overload being introduced).
+     */
+    public void upgradeToSSL(SSLSocketFactory sslSocketFactory, HostnameVerifier hostnameVerifier,
+            String host) throws IOException {
         SSLSocket sslSocket = sslSocketFactory.createSocket(this.socket);
         sslSocket.startHandshake();
         socket = sslSocket;
         inputStream = new ByteArrayInputStream(sslSocket.getInputStream());
         outputStream = new ByteArrayOutputStream(sslSocket.getOutputStream());
-        if (hostnameVerifier != null && !hostnameVerifier.verify(sslSocket.getInetAddress().getHostName(),
+        String verificationHost = host != null ? host : sslSocket.getInetAddress().getHostName();
+        if (hostnameVerifier != null && !hostnameVerifier.verify(verificationHost,
             sslSocket.getSession())) {
-            throw new IdentityVerificationException("\"" + sslSocket.getInetAddress().getHostName() +
+            throw new IdentityVerificationException("\"" + verificationHost +
                 "\" identity was not confirmed");
         }
         isSSL = true;
